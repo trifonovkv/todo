@@ -8,6 +8,9 @@ Features:
 - mark a specific task completed or not  
 
 ## Installation
+For Ubuntu need to install `jq`  
+`sudo apt install jq`  
+
 `wget https://raw.githubusercontent.com/trifonovkv/todo/main/todo`   
 `chmod +x ./todo`
 
