@@ -1,0 +1,89 @@
+#!/bin/sh
+
+TODO_FILE=~/.todo
+
+add_task() {
+    text="$@"
+    object=$(jq  --arg key0 'start'  --arg value0 $(date +%s) \
+        --arg key1 'end'    --arg value1 '0' \
+        --arg key2 'text'   --arg value2 "$text" \
+        '. | .[$key0]=$value0 | .[$key1]=$value1 | .[$key2]=$value2' <<<'{}')
+    json=$(cat $TODO_FILE)
+    echo "$json" | jq ". + [$object]" > $TODO_FILE
+}
+
+complete_task() {
+    echo "$(jq ".[$(($1-1))].end=\"$(date +%s)\"" $TODO_FILE)" > $TODO_FILE
+}
+
+incomplete_task() {
+    echo "$(jq ".[$(($1-1))].end=\"0\"" $TODO_FILE)" > $TODO_FILE
+}
+
+delete_task() {
+    echo "$(jq "del(.[$(($1-1))])" $TODO_FILE)" > $TODO_FILE
+}
+
+show_task() {
+    start=$(date '+%H:%M %d/%m' -d "@$(jq -r ".[$1].start" $TODO_FILE)")
+    text=$(jq ".[$1].text" $TODO_FILE)
+    ends=$(jq -r ".[$1].end" $TODO_FILE)
+    if (( $ends > 0 ));then
+        end=$(date '+%H:%M %d/%m' -d "@$ends")
+        printf "\e[9;33m%3d. %28s %s\e[0m\n" $(($1+1)) "($start - $end)" "$text"
+    else
+        printf "%3d. %14s %s\n" $(($1+1)) "($start)" "$text"
+    fi
+}
+
+show_tasks() {
+    for (( i=0; i<$(jq length $TODO_FILE); i++ ))
+    do
+        show_task $i  
+    done
+}
+
+if [ ! -f $TODO_FILE ]; then
+    touch $TODO_FILE
+fi
+
+if [ ! -s $TODO_FILE ]; then
+    echo "[]" > $TODO_FILE
+fi
+
+if [ "$#" -eq 0 ]; then
+    while :; do
+        echo
+        show_tasks
+        echo "---"
+        echo "[c]omplete task <number>"
+        echo "[i]ncomplete task <number>"
+        echo "[d]elete task <number>"
+        echo "[q]uit"
+        read -ep ": " 
+        IFS=' ' read opr num <<< $REPLY
+        if [ $opr == 'q' ]; then
+            exit 0;
+        fi
+        case $opr in
+            c)
+                echo "Complete task $num"
+                complete_task $num
+                ;;
+            i)
+                echo "Incomplete task $num"
+                incomplete_task $num
+                ;;
+            d)
+                echo "Delete task $num"
+                delete_task $num
+                ;;
+            *)
+                echo "Wrong operation: $REPLY"
+                ;;
+        esac
+    done
+else
+    add_task "$@"
+    show_tasks
+fi
